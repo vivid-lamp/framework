@@ -1,26 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SleepyLamp\Framework;
 
-use DI\ContainerBuilder;
+use think\Container;
 
-class App
+class App extends Container
 {
     protected $rootPath;
 
-    protected $container;
+    protected $bind = [
+        'http' => Http::class,
+    ];
 
     public function __construct($rootPath)
     {
-        $builder = new ContainerBuilder();
         $this->rootPath = $rootPath;
-        $this->container = $builder->build();
+        $this->instance(App::class, $this);
     }
 
-    public function getContainer()
-    {
-        return $this->container;
-    }
 
     public function getRootPath(): string
     {

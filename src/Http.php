@@ -1,27 +1,31 @@
 <?php
 
-namespace app\kernel;
+declare(strict_types=1);
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-use app\kernel\App;
-use Psr\Http\Server\MiddlewareInterface;
-use Psr\Http\Server\RequestHandlerInterface;
-use RuntimeException;
-use Slim\Psr7\Factory\ServerRequestFactory;
+namespace SleepyLamp\Framework;
+
 use Throwable;
+use RuntimeException;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+use Slim\Psr7\Factory\ServerRequestFactory;
+use SleepyLamp\Framework\Route;
 
 class Http
 {
+
     protected $app;
+
     protected $config;
+
+    protected $middleware = [];
 
     public function __construct(App $app, Config $config)
     {
-        $this->app = $app;
-        $this->config = $config;
+        $this->app      = $app;
+        $this->config   = $config;
     }
-
 
     public function run(?ServerRequestInterface $request = null)
     {
@@ -33,35 +37,28 @@ class Http
         }
         $this->send($response);
     }
-
     public function initialize()
     {
-        if (!$this->app->initialized()) {
-            $this->app->initialize();
-        }
     }
 
     public function runWithRequest(?ServerRequestInterface $request = null): ResponseInterface
     {
         $middleware = $this->config->get('middleware');
-        $middleware[] = $this;
-        $relay = new Relay($middleware, function ($entry) {
-            return is_object($entry) ? $entry : $this->app->make($entry);
-        });
-        $request = $request ?? ServerRequestFactory::createFromGlobals();
-        return $relay->handle($request);
-    }
 
-    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
-    {
-        return $this->dispatchToRoute($request);
+        $middleware[] = function (ServerRequestInterface $request, RequestHandlerInterface $next) {
+            return $this->dispatchToRoute($request);
+        };
+
+        $request = $request ?? ServerRequestFactory::createFromGlobals();
+
+        return (new RequestHandler($middleware))->handle($request);
     }
 
     public function dispatchToRoute(ServerRequestInterface $request): ResponseInterface
     {
         $dispatcher = \FastRoute\simpleDispatcher(function (\FastRoute\RouteCollector $r) {
             Route::setRouteCollector($r);
-            include $this->app->getRootPath() . 'app/route/app.php';
+            require $this->app->getRootPath() . 'App/routes.php';
         });
 
         $uri    = $request->getUri()->getPath();
@@ -83,14 +80,12 @@ class Http
         [$handler, $middleware] = $handler;
 
         $middleware = $middleware ?? [];
+     
         $middleware[] = function (ServerRequestInterface $request, callable $next) use ($handler) {
             return $this->app->invoke($handler, [ServerRequestInterface::class => $request]);
         };
 
-        $relay = new Relay($middleware, function ($entry) {
-            return is_object($entry) ? $entry : $this->app->make($entry);
-        });
-        return $relay->handle($request);
+        return (new RequestHandler($middleware))->handle($request);
     }
 
     public function send(ResponseInterface $response)
