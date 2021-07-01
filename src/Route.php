@@ -1,55 +1,56 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SleepyLamp\Framework;
 
 use FastRoute\RouteCollector;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 class Route
 {
     /** @var RouteCollector */
-    protected static $routeCollector;
+    protected $routeCollector;
 
-    /** @var string */
-    protected static $groupPrefix = '';
+    protected  $groupPrefix = '';
 
-    /** @var string|array */
-    protected static $groupMiddleware;
+    protected $groupMiddleware;
 
-    public static function setRouteCollector(RouteCollector $routeCollector)
+    protected $app;
+    
+    public function __construct(App $app)
     {
-        static::$routeCollector = $routeCollector;
+        $this->app = $app;
     }
 
-    /**
-     * @param string|string[] $method
-     * @param string $route
-     * @param Closure|string[2] $handler
-     * @param string|string[] $middleware
-     */
-    public static function addRoute($method, $route, $handler, $middleware = [])
+    public function addRoute($method, $route, $handler, $middleware = '')
     {
-        $route = static::$groupPrefix . $route;
+        $route = $this->groupPrefix . $route;
 
-        if (!is_array($middleware)) {
+        if (!empty($middleware) && !is_array($middleware)) {
             $middleware = [$middleware];
+        } else {
+            $middleware = [];
         }
-        if (is_array(static::$groupMiddleware)) {
-            $middleware = array_merge(static::$groupMiddleware, $middleware);
-        } elseif (isset(static::$groupMiddleware)) {
-            array_push($middleware, static::$groupMiddleware);
+
+        if (is_array($this->groupMiddleware)) {
+            $middleware = array_merge($this->groupMiddleware, $middleware);
+        } elseif (!empty($this->groupMiddleware)) {
+            array_push($middleware, $this->groupMiddleware);
         }
-        static::$routeCollector->addRoute($method, $route, [$handler, $middleware]);
+
+        $this->routeCollector->addRoute($method, $route, [$handler, $middleware]);
     }
 
-
-    public static function get($route, $handler, $middleware = [])
+    public function get($route, $handler, $middleware = '')
     {
-        static::$routeCollector->addRoute('GET', $route, [$handler, $middleware]);
+        $this->routeCollector->addRoute('GET', $route, [$handler, $middleware]);
     }
 
-    public static function post($route, $handler, $middleware = [])
+    public function post($route, $handler, $middleware = [])
     {
-        static::$routeCollector->addRoute('POST', $route, [$handler, $middleware]);
+        $this->routeCollector->addRoute('POST', $route, [$handler, $middleware]);
     }
 
     /**
@@ -57,14 +58,48 @@ class Route
      * @param callable $callable
      * @param string|string[] $middleware
      */
-    public static function addGroup($prefix, $callable, $middleware = [])
+    public function addGroup($prefix, $callable, $middleware = '')
     {
-        $currentGroupPrefix = static::$groupPrefix;
-        $currentGroupMiddleware = static::$groupMiddleware;
-        static::$groupPrefix = $prefix;
-        static::$groupMiddleware = $middleware;
+        $currentGroupPrefix = $this->groupPrefix;
+        $currentGroupMiddleware = $this->groupMiddleware;
+        $this->groupPrefix = $prefix;
+        $this->groupMiddleware = $middleware;
         $callable();
-        static::$groupPrefix = $currentGroupPrefix;
-        static::$groupMiddleware = $currentGroupMiddleware;
+        $this->groupPrefix = $currentGroupPrefix;
+        $this->groupMiddleware = $currentGroupMiddleware;
+    }
+
+    public function dispatch(ServerRequestInterface $request): ResponseInterface
+    {
+        $fastDispatcher = \FastRoute\simpleDispatcher(function (\FastRoute\RouteCollector $r) {
+            $this->routeCollector = $r;
+            require $this->app->getRootPath() . 'App/routes.php';
+        });
+
+        $uri    = $request->getUri()->getPath();
+        $method = $request->getMethod();
+
+        $info   = $fastDispatcher->dispatch($method, $uri);
+
+        [$routeStatus, $handler] = $info;
+        $routeParam = $info[2] ?? [];
+
+        foreach ($routeParam as $key => $val) {
+            $request = $request->withAttribute($key, $val);
+        }
+
+        if ($routeStatus !== \FastRoute\Dispatcher::FOUND) {
+            throw new \RuntimeException('Route missed');
+        }
+
+        [$handler, $middleware] = $handler;
+
+        $middleware = $middleware ?? [];
+     
+        $middleware[] = function (ServerRequestInterface $request, callable $next) use ($handler) {
+            return $this->app->invoke($handler, [ServerRequestInterface::class => $request]);
+        };
+
+        return (new RequestHandler($middleware))->handle($request);
     }
 }
