@@ -1,9 +1,9 @@
 {
-    "name": "sleepy-lamp/framework",
+    "name": "vivid-lamp/framework",
     "description": "php easy framework component",
     "authors": [
         {
-            "name": "sleepy-lamp",
+            "name": "vivid-lamp",
             "email": "1903213068@qq.com"
         }
     ],
@@ -14,11 +14,11 @@
         "nikic/fast-route": "^1.3",
         "psr/http-server-handler": "^1.0",
         "psr/http-server-middleware": "^1.0",
-        "topthink/think-container": "^2.0"
+        "illuminate/container": "^8.49"
     },
     "autoload": {
         "psr-4": {
-          "SleepyLamp\\Framework\\": "src"
+          "VividLamp\\Framework\\": "src"
         }
     }
 }

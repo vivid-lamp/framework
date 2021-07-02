@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SleepyLamp\Framework;
+namespace VividLamp\Framework;
 
 use Throwable;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use Slim\Psr7\Factory\ServerRequestFactory;
-use SleepyLamp\Framework\Route;
+use VividLamp\Framework\Exception\Handler;
+use VividLamp\Framework\Route;
 
 class Http
 {
@@ -17,6 +17,8 @@ class Http
     protected $app;
 
     protected $middleware = [];
+
+    protected $routeConfigFile;
 
     public function __construct(App $app)
     {
@@ -26,10 +28,14 @@ class Http
     public function run(?ServerRequestInterface $request = null)
     {
         try {
+
             $this->initialize();
             $response = $this->runWithRequest($request);
+
         } catch (Throwable $e) {
-            throw $e;
+            $handler = $this->app->make(Handler::class);
+            $handler->report($e);
+            $response = $handler->render($request, $e);
         }
         $this->send($response);
     }
@@ -38,15 +44,18 @@ class Http
         $this->app->initialize();
     }
 
+    public function loadRouteConfig(string $file)
+    {
+        $this->routeConfigFile = $file;
+    }
+
     public function loadMiddleware(array $middleware)
     {
         $this->middleware = $middleware;
     }
 
-    public function runWithRequest(?ServerRequestInterface $request = null): ResponseInterface
+    public function runWithRequest(ServerRequestInterface $request): ResponseInterface
     {
-        $request = $request ?? ServerRequestFactory::createFromGlobals();
-
         $middleware = $this->middleware;
         $middleware[] = function (ServerRequestInterface $request, RequestHandlerInterface $next) {
             return $this->dispatchToRoute($request);
@@ -57,7 +66,9 @@ class Http
 
     public function dispatchToRoute(ServerRequestInterface $request): ResponseInterface
     {
-        return $this->app->make(Route::class)->dispatch($request);
+        $route = $this->app->make(Route::class, ['configFile' => $this->routeConfigFile]);
+        $this->app->instance(Route::class, $route);
+        return $route->dispatch($request);
     }
 
     public function send(ResponseInterface $response)

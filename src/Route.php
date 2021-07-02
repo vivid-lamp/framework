@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SleepyLamp\Framework;
+namespace VividLamp\Framework;
 
 use FastRoute\RouteCollector;
 use Psr\Http\Message\ResponseInterface;
@@ -18,10 +18,13 @@ class Route
     protected $groupMiddleware;
 
     protected $app;
+
+    protected $configFile;
     
-    public function __construct(App $app)
+    public function __construct(App $app, string $configFile)
     {
         $this->app = $app;
+        $this->configFile = $configFile;
     }
 
     public function addRoute($method, $route, $handler, $middleware = '')
@@ -73,7 +76,7 @@ class Route
     {
         $fastDispatcher = \FastRoute\simpleDispatcher(function (\FastRoute\RouteCollector $r) {
             $this->routeCollector = $r;
-            require $this->app->getRootPath() . 'App/routes.php';
+            require $this->configFile;
         });
 
         $uri    = $request->getUri()->getPath();
@@ -97,7 +100,10 @@ class Route
         $middleware = $middleware ?? [];
      
         $middleware[] = function (ServerRequestInterface $request, callable $next) use ($handler) {
-            return $this->app->invoke($handler, [ServerRequestInterface::class => $request]);
+            if (is_array($handler)) {
+                $handler[0] = $this->app->make($handler[0]);
+            }
+            return $this->app->call($handler, [ServerRequestInterface::class => $request]);
         };
 
         return (new RequestHandler($middleware))->handle($request);

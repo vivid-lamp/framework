@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SleepyLamp\Framework;
+namespace VividLamp\Framework;
 
 use Closure;
 use Psr\Http\Message\ServerRequestInterface;

@@ -1,13 +1,13 @@
 <?php
 
-namespace SleepyLamp\Framework\Facades;
+namespace VividLamp\Framework\Facades;
 
-use SleepyLamp\Framework\Facade;
+use VividLamp\Framework\Facade;
 
 class Route extends Facade
 {
-    protected static function getFacadeClass()
+    protected static function getFacadeClass(): string
     {
-        return \SleepyLamp\Framework\Route::class;
+        return \VividLamp\Framework\Route::class;
     }
 }

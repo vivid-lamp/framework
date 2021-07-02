@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SleepyLamp\Framework;
+namespace VividLamp\Framework;
 
-use think\Container;
+use Illuminate\Container\Container;
 
-class Facade
+abstract class Facade
 {
 
     protected static function createFacade()
@@ -14,12 +14,11 @@ class Facade
         return Container::getInstance()->make(static::getFacadeClass());
     }
 
-    protected static function getFacadeClass()
-    {}
+    abstract protected static function getFacadeClass(): string;
+    
 
     public static function __callStatic($method, $params)
     {
         return call_user_func_array([static::createFacade(), $method], $params);
     }
-
 }

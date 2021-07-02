@@ -2,28 +2,33 @@
 
 declare(strict_types=1);
 
-namespace SleepyLamp\Framework;
+namespace VividLamp\Framework;
 
-use think\Container;
-
+use Illuminate\Container\Container;
+use VividLamp\Framework\Error;
 
 class App extends Container
 {
+    /** @var string 程序根目录 */
     protected $rootPath;
 
     protected $loadedProviders;
 
-    protected $bind = [
-        'http' => Http::class,
-    ];
-
     public function __construct(string $rootPath)
     {
         $this->rootPath = $rootPath;
-        $this->instance(App::class, $this);
+
         static::setInstance($this);
+
+        $this->instance(App::class, $this);
+
+        $this->singleton('http', Http::class);
     }
 
+    /**
+     * 注册服务提供者
+     * @param string $provider
+     */
     public function register(string $provider)
     {
        $provider = new $provider($this);
@@ -33,6 +38,8 @@ class App extends Container
 
     public function initialize()
     {
+        $this->make(Error::class)->init();
+        
         $this->boot();
     }
 
