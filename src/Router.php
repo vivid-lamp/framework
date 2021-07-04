@@ -1,32 +1,39 @@
 <?php
-
 declare(strict_types=1);
 
 namespace VividLamp\Framework;
 
+use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use VividLamp\Framework\Exception\RouteMissed;
 
-class Route
+class Router
 {
     /** @var RouteCollector */
     protected $routeCollector;
 
-    protected  $groupPrefix = '';
+    protected $groupPrefix = '';
 
     protected $groupMiddleware;
 
     protected $app;
 
     protected $configFile;
-    
+
     public function __construct(App $app, string $configFile)
     {
         $this->app = $app;
         $this->configFile = $configFile;
     }
 
+    /**
+     * @param mixed $method
+     * @param string $route
+     * @param callable|array $handler
+     * @param string|array $middleware
+     */
     public function addRoute($method, $route, $handler, $middleware = '')
     {
         $route = $this->groupPrefix . $route;
@@ -51,7 +58,7 @@ class Route
         $this->routeCollector->addRoute('GET', $route, [$handler, $middleware]);
     }
 
-    public function post($route, $handler, $middleware = [])
+    public function post($route, $handler, $middleware = '')
     {
         $this->routeCollector->addRoute('POST', $route, [$handler, $middleware]);
     }
@@ -79,10 +86,16 @@ class Route
             require $this->configFile;
         });
 
-        $uri    = $request->getUri()->getPath();
+        $uri = $request->getUri()->getPath();
         $method = $request->getMethod();
 
-        $info   = $fastDispatcher->dispatch($method, $uri);
+        $info = $fastDispatcher->dispatch($method, $uri);
+
+        switch ($info[0]) {
+            case Dispatcher::NOT_FOUND:
+            case Dispatcher::METHOD_NOT_ALLOWED:
+                throw new RouteMissed('Route missed', $info[0]);
+        }
 
         [$routeStatus, $handler] = $info;
         $routeParam = $info[2] ?? [];
@@ -91,14 +104,14 @@ class Route
             $request = $request->withAttribute($key, $val);
         }
 
-        if ($routeStatus !== \FastRoute\Dispatcher::FOUND) {
+        if ($routeStatus !== Dispatcher::FOUND) {
             throw new \RuntimeException('Route missed');
         }
 
         [$handler, $middleware] = $handler;
 
         $middleware = $middleware ?? [];
-     
+
         $middleware[] = function (ServerRequestInterface $request, callable $next) use ($handler) {
             if (is_array($handler)) {
                 $handler[0] = $this->app->make($handler[0]);

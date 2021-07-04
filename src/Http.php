@@ -8,17 +8,18 @@ use Throwable;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use VividLamp\Framework\Exception\Handler;
-use VividLamp\Framework\Route;
+
 
 class Http
 {
-
+    /** @var App  */
     protected $app;
 
+    /** @var mixed[] */
     protected $middleware = [];
 
-    protected $routeConfigFile;
+    /** @var callable */
+    protected $routeDispatcher;
 
     public function __construct(App $app)
     {
@@ -33,25 +34,26 @@ class Http
             $response = $this->runWithRequest($request);
 
         } catch (Throwable $e) {
-            $handler = $this->app->make(Handler::class);
-            $handler->report($e);
-            $response = $handler->render($request, $e);
+
+            $this->app->getExceptionHandler()->report($e);
+            $response = $this->app->getExceptionHandler()->render($request, $e);
         }
         $this->send($response);
     }
+
     public function initialize()
     {
         $this->app->initialize();
     }
 
-    public function loadRouteConfig(string $file)
-    {
-        $this->routeConfigFile = $file;
-    }
-
     public function loadMiddleware(array $middleware)
     {
         $this->middleware = $middleware;
+    }
+
+    public function loadRouteDispatcher(callable $dispatcher)
+    {
+        $this->routeDispatcher = $dispatcher;
     }
 
     public function runWithRequest(ServerRequestInterface $request): ResponseInterface
@@ -66,9 +68,7 @@ class Http
 
     public function dispatchToRoute(ServerRequestInterface $request): ResponseInterface
     {
-        $route = $this->app->make(Route::class, ['configFile' => $this->routeConfigFile]);
-        $this->app->instance(Route::class, $route);
-        return $route->dispatch($request);
+        return ($this->routeDispatcher)($request);
     }
 
     public function send(ResponseInterface $response)

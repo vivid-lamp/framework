@@ -6,18 +6,11 @@ namespace VividLamp\Framework;
 
 abstract class ServiceProvider
 {
-
+    /** @var App */
     protected $app;
 
     public function __construct(App $app)
     {
         $this->app = $app;
-    }
-    public function register()
-    {
-    }
-
-    public function boot()
-    {
     }
 }

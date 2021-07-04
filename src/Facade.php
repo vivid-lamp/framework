@@ -11,7 +11,7 @@ abstract class Facade
 
     protected static function createFacade()
     {
-        return Container::getInstance()->make(static::getFacadeClass());
+        return Container::getInstance()->get(static::getFacadeClass());
     }
 
     abstract protected static function getFacadeClass(): string;

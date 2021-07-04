@@ -26,10 +26,10 @@ class RequestHandler implements RequestHandlerInterface
     {
         $middleware = current($this->queue);
         next($this->queue);
-        if (is_object($middleware) && $middleware instanceof MiddlewareInterface) {
-            return $middleware->process($request, $this);
-        } elseif ($middleware instanceof Closure) {
+        if ($middleware instanceof Closure) {
             return $middleware($request, $this);
+        } elseif (is_object($middleware) && $middleware instanceof MiddlewareInterface) {
+            return $middleware->process($request, $this);
         } else {
             $object = new $middleware();
             return $object->process($request, $this);
