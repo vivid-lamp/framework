@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace VividLamp\Framework;
@@ -14,12 +15,16 @@ class Router
     /** @var RouteCollector */
     protected $routeCollector;
 
+    /** @var string */
     protected $groupPrefix = '';
 
+    /** @var string[] */
     protected $groupMiddleware;
 
+    /** @var App */
     protected $app;
 
+    /** @var string */
     protected $configFile;
 
     public function __construct(App $app, string $configFile)
@@ -38,10 +43,10 @@ class Router
     {
         $route = $this->groupPrefix . $route;
 
-        if (!empty($middleware) && !is_array($middleware)) {
-            $middleware = [$middleware];
-        } else {
+        if (empty($middleware)) {
             $middleware = [];
+        } elseif (!is_array($middleware)) {
+            $middleware = [$middleware];
         }
 
         if (is_array($this->groupMiddleware)) {
@@ -86,34 +91,22 @@ class Router
             require $this->configFile;
         });
 
-        $uri = $request->getUri()->getPath();
-        $method = $request->getMethod();
+        $info = $fastDispatcher->dispatch($request->getMethod(), $request->getUri()->getPath());
 
-        $info = $fastDispatcher->dispatch($method, $uri);
-
-        switch ($info[0]) {
-            case Dispatcher::NOT_FOUND:
-            case Dispatcher::METHOD_NOT_ALLOWED:
-                throw new RouteMissed('Route missed', $info[0]);
+        if ($info[0] === Dispatcher::NOT_FOUND || $info[0] === Dispatcher::METHOD_NOT_ALLOWED) {
+            throw new RouteMissed('Route missed', $info[0]);
         }
 
-        [$routeStatus, $handler] = $info;
         $routeParam = $info[2] ?? [];
 
         foreach ($routeParam as $key => $val) {
             $request = $request->withAttribute($key, $val);
         }
 
-        if ($routeStatus !== Dispatcher::FOUND) {
-            throw new \RuntimeException('Route missed');
-        }
-
-        [$handler, $middleware] = $handler;
-
-        $middleware = $middleware ?? [];
+        [$handler, $middleware] = $info[1];
 
         $middleware[] = function (ServerRequestInterface $request, callable $next) use ($handler) {
-            if (is_array($handler)) {
+            if (is_array($handler) && !is_object($handler[0])) {
                 $handler[0] = $this->app->make($handler[0]);
             }
             return $this->app->call($handler, [ServerRequestInterface::class => $request]);
